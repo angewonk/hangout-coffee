@@ -38,14 +38,25 @@ document.getElementById('orderForm').addEventListener('submit', function(event) 
 
     // Prepare the email details with cart items
     const cart = getCart();
-    const cartItemsDetails = cart.map(item => `${item.name}: ${item.quantity} x ₱${(item.price / item.quantity).toFixed(2)}`).join('\n');
-    const totalCartPrice = cart.reduce((total, item) => total + item.price, 0).toFixed(2);
+    ///const cartItemsDetails = cart.map(item => `${item.name}: ${item.quantity} x ₱${(item.price / item.quantity).toFixed(2)}`).join('\n');
+    const prodnamedetails = cart.map(item =>  `${item.name}\n`).join('');
+    const unitpricedetails = cart.map(item =>  `₱${item.price.toFixed(2)}\n`).join('');
+    const quantitydetails = cart.map(item =>  `${item.quantity}\n`).join('');
+    const producttotaldetails = cart.map(item => `₱${(item.price * item.quantity).toFixed(2)}\n`).join('');
+
+    const totalCartPrice = cart.reduce((total, item) => total + (item.price * item.quantity), 0).toFixed(2);
+
 
     const templateParams = {
         from_name: customerWithOrderNumber,
         to_name: "QC Branch", // Fixed recipient
         cust_details: `Customer: ${formData.firstName} ${formData.lastName}\nAddress: ${formData.address}, ${formData.city}\nContact: ${formData.contact}\nEmail: ${formData.email}\nNote: ${formData.note}\nOrder Date: ${currentDay}, ${formattedDate}\nOrder Time: ${formattedTime}`,
-        order_details: `Cart Items:\n${cartItemsDetails}\n\nTotal Price: ₱${totalCartPrice}`,
+        //order_details: `Cart Items:\n${cartItemsDetails}\n\nTotal Price: ₱${totalCartPrice}`,
+        product_name: `${prodnamedetails}`,
+        product_quantity: `${quantitydetails}`,
+        product_unitprice: `${unitpricedetails}`,
+        product_total:`${producttotaldetails}`,
+        total_price: `₱${totalCartPrice}`,
         order_number: customerWithOrderNumber,
         date: formattedDate,
         time: formattedTime,
@@ -194,21 +205,16 @@ function populateCartPage(cart) {
         const itemImage = `<img onclick="deleteItem(${index})" src="/cart/pics/${item.name.toLowerCase().replace(/\s+/g, '_')}.png" alt="${item.name}" style="margin-right:-10%; background-color: #FDF8ED;">`;
         const itemDetails = `<span class="o-details"><p>${item.name}</p></span>`;
         const redCircle = `<span id="span1" style="position: absolute; cursor: pointer;" class="red-circle">&times;</span>`;
-
-        // Use the item's unit price (price divided by quantity) to calculate the correct total
-        const unitPrice = item.price / item.quantity; 
-        const itemPrice = `<span class="o-price"><p id="unit-price-${index}">₱ ${unitPrice.toFixed(2)}</p></span>`;
-
+        const itemPrice = `<span class="o-price"><p id="price-${index}">₱ ${item.price.toFixed(2)}</p></span>`;
         const itemQuantity = `
             <span class="o-quantity">
-                <button onclick="decrement('input-${index}', ${unitPrice}, 'total-${index}')">-</button>
-                <input id="input-${index}" type="number" value="${item.quantity}" min="1" style="width: 50px;" onchange="updateItemTotal('input-${index}', ${unitPrice}, 'total-${index}')">
-                <button onclick="increment('input-${index}', ${unitPrice}, 'total-${index}')">+</button>
+                <button onclick="decrement('input-${index}', 'price-${index}', 'total-${index}')">-</button>
+                <input id="input-${index}" type="number" value="${item.quantity}" min="1" style="width: 50px;" onchange="updateItemTotal('input-${index}', 'price-${index}', 'total-${index}')">
+                <button onclick="increment('input-${index}', 'price-${index}', 'total-${index}')">+</button>
             </span>
         `;
-
-        // Total is based on unit price * quantity
-        const itemTotal = `<span id="total-${index}" class="o-total">₱ ${(unitPrice * item.quantity).toFixed(2)}</span>`;
+        const itemTotalPrice = (item.price) * (item.quantity);
+        const itemTotal = `<span id="total-${index}" class="o-total">₱ ${itemTotalPrice.toFixed(2)}</span>`;
 
         orderItem.innerHTML = `
             ${itemImage}
@@ -223,32 +229,53 @@ function populateCartPage(cart) {
     });
 }
 
-
-// Functions to increment and decrement quantities
-function updateItemTotal(inputId, unitPrice, totalId) {
+function updateItemTotal(inputId, priceId, totalId) {
     let quantity = document.getElementById(inputId).value;
-    let total = quantity * unitPrice;
+    let price = extractPrice(document.getElementById(priceId).textContent);
+    let total = quantity * price;
     document.getElementById(totalId).textContent = `₱ ${total.toFixed(2)}`;
 
     // Call function to update the subtotal and total
     updateSubtotal();
 }
 
+function refreshCart() {
+    const cart = getCart();
+    populateCartPage(cart);
+    updateSubtotal();
+}
 
-// Function to handle increment
+
+
 function increment(inputId, priceId, totalId) {
     let input = document.getElementById(inputId);
     input.value = parseInt(input.value) + 1;
+
+    // Update item total and cart
     updateItemTotal(inputId, priceId, totalId);
+    updateCartInStorage(inputId);
 }
 
-// Function to handle decrement
 function decrement(inputId, priceId, totalId) {
     let input = document.getElementById(inputId);
     if (parseInt(input.value) > 1) {
         input.value = parseInt(input.value) - 1;
+
+        // Update item total and cart
         updateItemTotal(inputId, priceId, totalId);
+        updateCartInStorage(inputId);
     }
+}
+
+function updateCartInStorage(inputId) {
+    let cart = getCart();
+    let index = inputId.split('-')[1]; // Extract index from inputId
+
+    let quantity = parseInt(document.getElementById(inputId).value);
+    cart[index].quantity = quantity; // Update quantity in cart
+
+    saveCart(cart); // Save updated cart to localStorage
+    refreshCart(); // Refresh the cart display
 }
 
 // Function to update the subtotal for all items
@@ -260,11 +287,8 @@ function updateSubtotal() {
         subtotal += extractPrice(total.textContent);
     });
 
-    // Format the subtotal with commas for thousands, millions, etc.
-    const formattedSubtotal = subtotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
-    document.getElementById("confirm-subtotal").textContent = `₱ ${formattedSubtotal}`;
-    document.getElementById("confirm-total").textContent = `₱ ${formattedSubtotal}`;
+    document.getElementById("confirm-subtotal").textContent = `₱ ${subtotal.toFixed(2)}`;
+    document.getElementById("confirm-total").textContent = `₱ ${subtotal.toFixed(2)}`;
 }
 
 // Function to extract the price value from a price text (removing the "₱" sign)
