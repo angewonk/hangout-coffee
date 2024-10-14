@@ -8,6 +8,7 @@ document.addEventListener('DOMContentLoaded', function (event) {
 });
 
 // Handle the order form submission
+// Handle the order form submission
 document.getElementById('orderForm').addEventListener('submit', function(event) {
     event.preventDefault(); // Prevent default form submission
 
@@ -38,15 +39,48 @@ document.getElementById('orderForm').addEventListener('submit', function(event) 
 
     // Prepare the email details with cart items
     const cart = getCart();
-    const cartItemsDetails = cart.map(item => `${item.name}: ${item.quantity} x ₱${(item.price / item.quantity).toFixed(2)}`).join('\n');
     const totalCartPrice = cart.reduce((total, item) => total + item.price, 0).toFixed(2);
 
-    
+    // Create table HTML structure
+    let cartItemsTable = `
+        <table border="1" cellpadding="5" cellspacing="0">
+            <thead>
+                <tr>
+                    <th>Item Name</th>
+                    <th>Quantity</th>
+                    <th>Price (₱)</th>
+                </tr>
+            </thead>
+            <tbody>`;
+
+    // Add cart items dynamically
+    cart.forEach(item => {
+        cartItemsTable += `
+            <tr>
+                <td>${item.name}</td>
+                <td>${item.quantity}</td>
+                <td>${item.price.toFixed(2)}</td>
+            </tr>`;
+    });
+
+    // Add total price row
+    cartItemsTable += `
+            <tr>
+                <td colspan="2" style="text-align: right;"><strong>Total Price:</strong></td>
+                <td>₱${totalCartPrice}</td>
+            </tr>
+        </tbody>
+    </table>`;
+
+    // Display the order details in the form of a table (optional step, if you want to show it on the page)
+    document.getElementById("orderSummary").innerHTML = cartItemsTable;
+
+    // Prepare the email parameters
     const templateParams = {
         from_name: customerWithOrderNumber,
         to_name: "QC Branch", // Fixed recipient
         cust_details: `Customer: ${formData.firstName} ${formData.lastName}\nAddress: ${formData.address}, ${formData.city}\nContact: ${formData.contact}\nEmail: ${formData.email}\nNote: ${formData.note}\nOrder Date: ${currentDay}, ${formattedDate}\nOrder Time: ${formattedTime}`,
-        order_details: `Cart Items:\n ${cartItemsDetails}\n\nTotal Price: ₱${totalCartPrice}`,
+        order_details: cartItemsTable, // Pass the table HTML for order details
         order_number: customerWithOrderNumber,
         date: formattedDate,
         time: formattedTime,
