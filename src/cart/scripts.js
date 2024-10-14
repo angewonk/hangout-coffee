@@ -43,6 +43,7 @@ document.getElementById('orderForm').addEventListener('submit', function(event) 
     const unitpricedetails = cart.map(item =>  `₱${item.price.toFixed(2)}\n`).join('');
     const quantitydetails = cart.map(item =>  `${item.quantity}\n`).join('');
     const producttotaldetails = cart.map(item => `₱${(item.price * item.quantity).toFixed(2)}\n`).join('');
+    
 
     const totalCartPrice = cart.reduce((total, item) => total + (item.price * item.quantity), 0).toFixed(2);
 
@@ -60,7 +61,8 @@ document.getElementById('orderForm').addEventListener('submit', function(event) 
         order_number: customerWithOrderNumber,
         date: formattedDate,
         time: formattedTime,
-        day: currentDay
+        day: currentDay,
+        cc_email: `${formData.email}`
     };
 
     // Send the email using the QC template
@@ -207,14 +209,15 @@ function populateCartPage(cart) {
         const redCircle = `<span id="span1" style="position: absolute; cursor: pointer;" class="red-circle">&times;</span>`;
         const itemPrice = `<span class="o-price"><p id="price-${index}">₱ ${item.price.toFixed(2)}</p></span>`;
         const itemQuantity = `
-            <span class="o-quantity">
-                <button onclick="decrement('input-${index}', 'price-${index}', 'total-${index}')">-</button>
-                <input id="input-${index}" type="number" value="${item.quantity}" min="1" style="width: 50px;" onchange="updateItemTotal('input-${index}', 'price-${index}', 'total-${index}')">
-                <button onclick="increment('input-${index}', 'price-${index}', 'total-${index}')">+</button>
-            </span>
+        <span class="o-quantity">
+            <button onclick="decrement('input-${index}', 'price-${index}', 'total-${index}')">-</button>
+            <input id="input-${index}" type="number" value="${item.quantity}" min="1" style="width: 50px;" onchange="updateTypedQuantity('input-${index}', 'price-${index}', 'total-${index}', ${index})">
+            <button onclick="increment('input-${index}', 'price-${index}', 'total-${index}')">+</button>
+        </span>
         `;
         const itemTotalPrice = (item.price) * (item.quantity);
-        const itemTotal = `<span id="total-${index}" class="o-total">₱ ${itemTotalPrice.toFixed(2)}</span>`;
+        const formattedItemTotalPrice = itemTotalPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        const itemTotal = `<span id="total-${index}" class="o-total">₱ ${formattedItemTotalPrice}</span>`;
 
         orderItem.innerHTML = `
             ${itemImage}
@@ -233,7 +236,8 @@ function updateItemTotal(inputId, priceId, totalId) {
     let quantity = document.getElementById(inputId).value;
     let price = extractPrice(document.getElementById(priceId).textContent);
     let total = quantity * price;
-    document.getElementById(totalId).textContent = `₱ ${total.toFixed(2)}`;
+    const formattedTotal = total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    document.getElementById(totalId).textContent = `₱ ${formattedTotal}`;
 
     // Call function to update the subtotal and total
     updateSubtotal();
@@ -287,8 +291,11 @@ function updateSubtotal() {
         subtotal += extractPrice(total.textContent);
     });
 
-    document.getElementById("confirm-subtotal").textContent = `₱ ${subtotal.toFixed(2)}`;
-    document.getElementById("confirm-total").textContent = `₱ ${subtotal.toFixed(2)}`;
+    // Format the subtotal with commas for thousands, millions, etc.
+    const formattedSubtotal = subtotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+    document.getElementById("confirm-subtotal").textContent = `₱ ${formattedSubtotal}`;
+    document.getElementById("confirm-total").textContent = `₱ ${formattedSubtotal}`;
 }
 
 // Function to extract the price value from a price text (removing the "₱" sign)
@@ -302,3 +309,32 @@ document.addEventListener('DOMContentLoaded', function() {
     populateCartPage(cart); // Populate the cart on page load
     updateSubtotal(); // Update subtotal on page load
 });
+
+function updateTypedQuantity(inputId, priceId, totalId, index) {
+    let input = document.getElementById(inputId);
+    let newQuantity = parseInt(input.value);
+
+    // Validate the new quantity
+    if (isNaN(newQuantity) || newQuantity < 1) {
+        alert("Please enter a valid quantity.");
+        input.value = 1;  // Reset to 1 if invalid
+        newQuantity = 1;
+    }
+
+    // Get the current cart from localStorage
+    let cart = getCart();
+
+    // Update the quantity for the specific item in the cart
+    cart[index].quantity = newQuantity;
+
+    // Update the total price for the item
+    const unitPrice = extractPrice(document.getElementById(priceId).textContent); // Extract the unit price
+    const newTotalPrice = unitPrice * newQuantity;
+    document.getElementById(totalId).textContent = `₱ ${newTotalPrice.toFixed(2)}`; // Update the item total in the UI
+
+    // Save the updated cart to localStorage
+    saveCart(cart);
+
+    // Refresh the entire cart to reflect the new quantity and prices
+    refreshCart();
+}
